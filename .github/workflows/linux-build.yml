@@ -1,0 +1,59 @@
+name: Linux Build
+
+on:
+  workflow_call:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-24.04
+            target: x86_64-linux-gnu
+            artifact: Zip-Linux-x64.so
+
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            target: aarch64-linux-gnu
+            artifact: Zip-Linux-arm64.so
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Clone zip repo
+        run: git clone https://github.com/kuba--/zip.git
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            build-essential \
+            cmake \
+
+      - name: Configure CMake
+        run: |
+          cmake -S zip -B build \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_DISABLE_TESTING=ON \
+
+      - name: Build shared library
+        run: cmake --build build
+
+      - name: Prepare artifact
+        run: |
+          mkdir output
+
+          LIB_PATH=$(find build -type f -name "*.so" | head -n 1)
+
+          cp "$LIB_PATH" "output/${{ matrix.artifact }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: output/*

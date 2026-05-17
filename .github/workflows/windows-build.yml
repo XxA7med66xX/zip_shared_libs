@@ -1,0 +1,53 @@
+name: Windows Build
+
+on:
+  workflow_call:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-2022
+            cmake_arch: x64
+            artifact: Zip-Windows-x64.dll
+
+          - arch: arm64
+            runner: windows-11-arm
+            cmake_arch: ARM64
+            artifact: Zip-Windows-arm64.dll
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Clone zip repo
+        run: git clone https://github.com/kuba--/zip.git
+          
+      - name: Configure CMake
+        run: |
+          cmake -S zip -B build `
+            -DBUILD_SHARED_LIBS=ON `
+            -DCMAKE_DISABLE_TESTING=ON `
+
+      - name: Build shared library
+        run: cmake --build build
+
+      - name: Prepare artifact
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force output | Out-Null
+
+          $dll = Get-ChildItem build -Recurse -Filter *.dll | Select-Object -First 1
+
+          Copy-Item $dll.FullName "output/${{ matrix.artifact }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-${{ matrix.arch }}
+          path: output/*

@@ -1,0 +1,54 @@
+name: Build & Release
+
+on:
+  workflow_dispatch:
+    
+  schedule:
+    - cron: '0 0 * * 0'    
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    uses: ./.github/workflows/linux-build.yml
+
+  macos:
+    uses: ./.github/workflows/mac-build.yml
+
+  windows:
+    uses: ./.github/workflows/windows-build.yml
+
+  release:
+    needs:
+      - linux
+      - macos
+      - windows
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display files
+        run: find artifacts -type f
+
+      - name: Create release tag
+        id: tag
+        run: |
+          TAG=release-$(date +'%Y%m%d-%H%M%S')
+
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Continuous build
+          files: |
+            artifacts/**/*.so
+            artifacts/**/*.dll
+            artifacts/**/*.dylib

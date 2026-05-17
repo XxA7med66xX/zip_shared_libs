@@ -1,0 +1,50 @@
+name: MacOS Build
+
+on:
+  workflow_call:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: macos-15-intel
+            artifact: Zip-MacOS-x64.dylib
+
+          - arch: arm64
+            runner: macos-15
+            artifact: Zip-MacOS-arm64.dylib
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Clone zip repo
+        run: git clone https://github.com/kuba--/zip.git
+
+      - name: Configure CMake
+        run: |
+          cmake -S zip -B build \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_DISABLE_TESTING=ON \
+
+      - name: Build shared library
+        run: cmake --build build
+
+      - name: Prepare artifact
+        run: |
+          mkdir output
+
+          LIB_PATH=$(find build -type f -name "*.dylib" | head -n 1)
+
+          cp "$LIB_PATH" "output/${{ matrix.artifact }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: output/*
